@@ -1,0 +1,33 @@
+name: Build Qt qwindows.dll
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Download Qt 5.15.9 source
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://download.qt.io/archive/qt/5.15/5.15.9/single/qt-everywhere-opensource-src-5.15.9.tar.xz" `
+            -OutFile "$env:RUNNER_TEMP\qt.tar.xz"
+
+      - name: Extract Qt source
+        shell: powershell
+        run: |
+          7z x "$env:RUNNER_TEMP\qt.tar.xz" -o"$env:RUNNER_TEMP"
+          7z x "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9.tar" -o"$env:RUNNER_TEMP"
+
+      - name: Show Windows platform plugin source
+        shell: powershell
+        run: |
+          Get-ChildItem "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\src\plugins\platforms\windows"
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwindows-source
+          path: ${{ runner.temp }}/qt-everywhere-src-5.15.9/qtbase/src/plugins/platforms/windows/
