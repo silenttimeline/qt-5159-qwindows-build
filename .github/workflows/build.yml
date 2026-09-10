@@ -1,4 +1,4 @@
-name: Build Qt qwindows.dll
+name: Build Qt 5.15.9 Windows x64
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - name: Download Qt 5.15.9 source
+      - name: Download Qt source
         shell: powershell
         run: |
           Invoke-WebRequest `
@@ -21,13 +21,44 @@ jobs:
           7z x "$env:RUNNER_TEMP\qt.tar.xz" -o"$env:RUNNER_TEMP"
           7z x "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9.tar" -o"$env:RUNNER_TEMP"
 
-      - name: Show Windows platform plugin source
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure Qt
+        shell: cmd
+        working-directory: ${{ runner.temp }}\qt-everywhere-src-5.15.9\qtbase
+        run: |
+          configure.bat -release -opensource -confirm-license -platform win32-msvc -nomake examples -nomake tests -no-openssl -no-dbus
+
+      - name: Build Qt
+        shell: cmd
+        working-directory: ${{ runner.temp }}\qt-everywhere-src-5.15.9\qtbase
+        run: |
+          nmake
+
+      - name: Find qwindows.dll
         shell: powershell
         run: |
-          Get-ChildItem "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\src\plugins\platforms\windows"
+          Get-ChildItem `
+            "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase" `
+            -Recurse `
+            -Filter qwindows.dll |
+            Select-Object FullName
 
-      - name: Upload source
+      - name: Collect Qt DLLs
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\output"
+          Copy-Item "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\bin\Qt5Core.dll" "$env:GITHUB_WORKSPACE\output\"
+          Copy-Item "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\bin\Qt5Gui.dll" "$env:GITHUB_WORKSPACE\output\"
+          Copy-Item "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\bin\Qt5Widgets.dll" "$env:GITHUB_WORKSPACE\output\"
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\output\platforms"
+          Copy-Item "$env:RUNNER_TEMP\qt-everywhere-src-5.15.9\qtbase\plugins\platforms\qwindows.dll" "$env:GITHUB_WORKSPACE\output\platforms\"
+
+      - name: Upload Qt runtime
         uses: actions/upload-artifact@v4
         with:
-          name: qwindows-source
-          path: ${{ runner.temp }}/qt-everywhere-src-5.15.9/qtbase/src/plugins/platforms/windows/
+          name: Qt-5.15.9-MSVC-x64-runtime
+          path: output
